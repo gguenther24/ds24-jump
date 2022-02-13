@@ -1,3 +1,13 @@
 * {
     font-family: system-ui;
 }
+
+p {
+    font-size: 16px;
+    margin: 5px 0 25px;
+}
+
+#logo {
+    width: 200px;
+    height: auto;
+}

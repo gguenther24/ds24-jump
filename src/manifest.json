@@ -1,9 +1,9 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "ds24-jump",
   "version": "0.1.0",
   "description": "A Chrome/Chromium Browser Extension providing a quick jump between Jira Tickets, GitHub PRs and DynEnv.",
-  "browser_action": {
+  "action": {
     "default_popup": "popup.html",
     "default_icon": {
       "32": "assets/icon-32.png",
@@ -14,5 +14,9 @@
   },
   "permissions": [
     "tabs"
+  ],
+  "host_permissions": [
+    "https://github.com/*",
+    "http://github.com/*"
   ]
 }
