@@ -119,7 +119,7 @@ const Identifier = class {
                 return fetch('https://github.com/hulkag/ds24-digistore/pull/' + this.githubPrId).then(r => r.text()).then(result => {
                     const dom = document.createElement("body");
                     dom.innerHTML = result;
-                    const jiraTicketTitle = dom.querySelector('h1.gh-header-title').textContent.replace(/(\r\n|\n|\r)/gm, "");
+                    const jiraTicketTitle = dom.querySelector('h1.gh-header-title').textContent.trim();
                     console.log("Jira Ticket title", jiraTicketTitle);
                     this.name = jiraTicketTitle;
                     let title = jiraTicketTitle.match(/DS[- _]\d{2,4}/);
