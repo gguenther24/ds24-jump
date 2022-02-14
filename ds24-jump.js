@@ -43,8 +43,8 @@ const JUMP_TARGETS = [
             return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/tree/');
         },
         getIdentifier: function (tab) {
-            const jiraTicket = tab.url.match(/(DS-\d+)/)[1];
-            return new Identifier(null, jiraTicket);
+            const jiraTicket = tab.url.match(/(DS-\d+)/);
+            return new Identifier(null, jiraTicket ? jiraTicket[1] : null);
         },
         createUrl: function (identifier) {
             return 'https://github.com/hulkag/ds24-digistore/branches/all?query=' + identifier.jiraTicket;
@@ -92,7 +92,7 @@ const Identifier = class {
     }
 
     hasGithubPrId() {
-        return this.githubPrId !== 0;
+        return Number(this.githubPrId) !== 0;
     }
 
     hasJiraTicket() {
@@ -116,6 +116,7 @@ const Identifier = class {
                     return this;
                 });
             case this.hasGithubPrId():
+                console.info(this);
                 return fetch('https://github.com/hulkag/ds24-digistore/pull/' + this.githubPrId).then(r => r.text()).then(result => {
                     const dom = document.createElement("body");
                     dom.innerHTML = result;
@@ -127,7 +128,7 @@ const Identifier = class {
                     return this;
                 });
             default:
-                console.warn('Not enough information provided.');
+                return null;
         }
     }
 }
@@ -151,10 +152,14 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let jumpTarget of JUMP_TARGETS) {
             if (jumpTarget.matchesCurrentTab(tab)) {
                 identifier = jumpTarget.getIdentifier(tab);
-                identifier.sync().then(function (syncedIdentifier) {
-                    console.log(syncedIdentifier)
-                    buildDialogBoxContent(syncedIdentifier);
-                });
+                let syncResult = identifier.sync();
+                if (null === syncResult) {
+                    buildFallbackDialogBoxContent();
+                } else {
+                    syncResult.then(function (syncedIdentifier) {
+                        buildDialogBoxContent(syncedIdentifier);
+                    });
+                }
                 break;
             }
         }
