@@ -17,6 +17,10 @@
   ],
   "host_permissions": [
     "https://github.com/*",
-    "http://github.com/*"
+    "http://github.com/*",
+    "https://*.dev.ds25.io/*",
+    "http://*.dev.ds25.io/*",
+    "https://digistore.atlassian.net/*",
+    "http://digistore.atlassian.net/*"
   ]
 }
