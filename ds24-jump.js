@@ -116,7 +116,6 @@ const Identifier = class {
                     return this;
                 });
             case this.hasGithubPrId():
-                console.info(this);
                 return fetch('https://github.com/hulkag/ds24-digistore/pull/' + this.githubPrId).then(r => r.text()).then(result => {
                     const dom = document.createElement("body");
                     dom.innerHTML = result;
