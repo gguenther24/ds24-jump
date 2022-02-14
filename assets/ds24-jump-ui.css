@@ -8,7 +8,6 @@ body {
 }
 
 p {
-    font-size: 16px;
     margin: 5px 0 25px;
 }
 
@@ -33,9 +32,16 @@ header,
     height: auto;
 }
 
-.jump-link {
+.jump-link-group {
     border-top: 1px solid #ccc;
-    text-decoration: none;
+    display: flex;
+}
+
+.jump-link-group .jump-link:nth-child(2) {
+    border-left: 1px solid #ccc;
+}
+
+.jump-link {
     padding: 7px 6px;
     display: flex;
     align-items: center;
@@ -43,6 +49,9 @@ header,
     color: #ccc;
     pointer-events: none;
     transition: all .25s ease-in-out;
+    font-size: 16px;
+    text-decoration: none;
+    width: 100%;
 }
 
 .jump-link img,

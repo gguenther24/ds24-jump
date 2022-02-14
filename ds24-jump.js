@@ -13,7 +13,12 @@ const JUMP_TARGETS = [
             return new Identifier(null, ticketNo);
         },
         createUrl: function (identifier) {
-            return 'https://digistore.atlassian.net/browse/' + identifier.jiraTicket;
+            return {
+                primary: {
+                    link: 'https://digistore.atlassian.net/browse/' + identifier.jiraTicket,
+                    label: this.name
+                }
+            }
         }
     },
     {
@@ -29,14 +34,17 @@ const JUMP_TARGETS = [
             return new Identifier(prId ? prId[1] : null, null);
         },
         createUrl: function (identifier) {
-            // Uncomment line to redirect to the pr instead of pr listing on github.
-            //return 'https://github.com/hulkag/ds24-digistore/pull/' + identifier.githubPrId;
-            return 'https://github.com/hulkag/ds24-digistore/pulls?q=' + identifier.jiraTicket + '+in%3Atitle';
+            return {
+                primary: {
+                    link: 'https://github.com/hulkag/ds24-digistore/pull/' + identifier.githubPrId,
+                    label: this.name
+                }
+            }
         }
     },
     {
-        name: 'GitHub Branch',
-        id: 'github_branch',
+        name: 'GitHub Find',
+        id: 'github_find',
         icon: 'assets/icon-github.png',
         bypassPing: true,
         matchesCurrentTab: function (tab) {
@@ -47,7 +55,16 @@ const JUMP_TARGETS = [
             return new Identifier(null, jiraTicket ? jiraTicket[1] : null);
         },
         createUrl: function (identifier) {
-            return 'https://github.com/hulkag/ds24-digistore/branches/all?query=' + identifier.jiraTicket;
+            return {
+                primary: {
+                    link: 'https://github.com/hulkag/ds24-digistore/branches/all?query=' + identifier.jiraTicket,
+                    label: 'Find Branches'
+                },
+                secondary: {
+                    link: 'https://github.com/hulkag/ds24-digistore/pulls?q=' + identifier.jiraTicket + '+in%3Atitle',
+                    label: 'Find PRs'
+                }
+            };
         }
     },
     {
@@ -63,7 +80,12 @@ const JUMP_TARGETS = [
             return new Identifier(prId, null);
         },
         createUrl: function (identifier) {
-            return 'https://digistore24-app-ds-review-' + identifier.githubPrId + '.dev.ds25.io';
+            return {
+                primary: {
+                    link: 'https://digistore24-app-ds-review-' + identifier.githubPrId + '.dev.ds25.io',
+                    label: this.name
+                }
+            };
         }
     },
     {
@@ -79,7 +101,16 @@ const JUMP_TARGETS = [
             return new Identifier(0, ticketNo);
         },
         createUrl: function (identifier) {
-            return 'https://mail.google.com/mail/#search/' + identifier.jiraTicket;
+            return {
+                primary: {
+                    link: 'https://mail.google.com/mail/#search/' + identifier.jiraTicket,
+                    label: identifier.jiraTicket
+                },
+                secondary: {
+                    link: 'https://mail.google.com/mail/#search/' + encodeURIComponent('#' + identifier.githubPrId),
+                    label: '#' + identifier.githubPrId
+                }
+            };
         }
     }
 ];
@@ -170,19 +201,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildFallbackDialogBoxContent() {
         dialogBox.classList.add('loaded');
-        dialogBox.innerHTML = '<a class="jump-link online" href="https://github.com/hulkag/ds24-digistore">DS24 GitHub</a>';
-        dialogBox.innerHTML += '<a class="jump-link online" href="https://digistore.atlassian.net/jira/software/c/projects/DS/issues">Jira</a>';
-        dialogBox.innerHTML += '<a class="jump-link online" href="https://digistore.atlassian.net/jira/dashboards/10540">Scrum Dashboard</a>';
+        dialogBox.innerHTML = '';
+        const fallbackLinks = [
+            ['DS24 Github', 'https://github.com/hulkag/ds24-digistore'],
+            ['My Pull Requests', 'https://github.com/hulkag/ds24-digistore/pulls/@me'],
+            ['Jira', 'https://digistore.atlassian.net/jira/software/c/projects/DS/issues'],
+            ['Scrum Dashboard', 'https://digistore.atlassian.net/jira/dashboards/10540'],
+            ['Google Cloud', 'https://console.cloud.google.com/home/dashboard?project=ds-dev-228617'],
+        ];
+        fallbackLinks.forEach(function(linkData) {
+            dialogBox.innerHTML += `<div class="jump-link-group"><a target="_blank" class="jump-link online" href="${linkData[1]}">${linkData[0]}</a></div>`;
+        });
     }
 
     function buildDialogBoxContent(identifier) {
         let anchors = [];
         for (let jumpTarget of JUMP_TARGETS) {
-            let url = jumpTarget.createUrl(identifier),
+            let urlData = jumpTarget.createUrl(identifier),
                 name = jumpTarget.name,
                 id = jumpTarget.id;
             if (!jumpTarget.bypassPing) {
-                ping(url).then(function (isAvailable) {
+                ping(urlData.primary.link).then(function (isAvailable) {
                     if (isAvailable) {
                         document.getElementById('jump_' + id).classList.add('online');
                     } else {
@@ -190,7 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
-            anchors.push(`<a class="jump-link ${jumpTarget.bypassPing ? 'online' : ''}" id="jump_${id}" href="${url}" id="${id}" target="_blank"><img src="${jumpTarget.icon}"> <span>${name}</span> <span class="status-indicator"></span></a>`);
+            let anchorHtml = `<a class="jump-link ${jumpTarget.bypassPing ? 'online' : ''}" id="jump_${id}" href="${urlData.primary.link}" target="_blank"><img src="${jumpTarget.icon}"> <span>${urlData.primary.label}</span> ${jumpTarget.bypassPing ? '' : '<span class="status-indicator"></span>'}</a>`;
+            if (urlData.hasOwnProperty('secondary')) {
+                anchorHtml += `<a class="jump-link online" id="jump_secondary_${id}" href="${urlData.secondary.link}" target="_blank"><span>${urlData.secondary.label}</span></a>`;
+            }
+            anchors.push(`<div class="jump-link-group">${anchorHtml}</div>`);
         }
         dialogBox.classList.add('loaded');
         dialogBox.innerHTML = '<strong>' + identifier.name + '</strong>';
