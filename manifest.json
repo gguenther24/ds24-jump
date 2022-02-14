@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Digistore24 DevJumper",
+  "name": "DigiJump",
   "version": "0.3.0",
   "description": "A Chrome/Chromium Browser Extension providing a quick jump between Jira Tickets, GitHub PRs and DynEnv.",
   "homepage_url": "https://github.com/dsentker24/ds24-jump",

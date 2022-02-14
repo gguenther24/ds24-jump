@@ -1,4 +1,4 @@
-# Digistore24 DevJumper
+# DigiJump
 
 **A Chrome/Chromium Extension providing a quick jump between Jira Tickets, GitHub PRs and DynEnv.**
 ![Extension Screenshot](docs/extension-screenshot.png)
@@ -29,15 +29,15 @@ If not viewing a Jira Ticket or Pull Request, this extension show links to Githu
    - Just Drag and Drop the .crx file in this directory to the extension overview
    - Alternatively, click to "Load unpacked". Then head to this directory and click "Load".
 
-### Notes
+## Notes
 * This extension heavily relies on making internal calls to github. You may need to login / authorize at github before open the extension popup.
 * This extension is not tested on Edge.
 * Local installed extensions are not auto-updated. So check version numbers in case of any updates and repeat the steps shown at "Installation"
 
-### Support
+## Support
 If you have any problems or feature suggestions, you can submit a [new issue here](https://github.com/dsentker24/ds24-jump/issues/new/choose). I am happy about every PR and every issue.
 
 ### Ideas
 - Search in Slack Messages
 - Create k8s namespace command
-- Use Github API instead of DOM crawling
+- Use Github API instead of DOM crawling (Token required)
