@@ -22,7 +22,7 @@ const identifierFactory = {
             if (branchRow) {
                 branchName = branchRow.getAttribute('branch');
                 name = branchRow.querySelector('.branch-name').textContent;
-                githubPrId = branchRow.querySelector('[data-hovercard-url^="/hulkag/ds24-digistore/pull/"]').dataset.hovercardUrl.matchfirstMatch(/pull\/(\d+)/);
+                githubPrId = branchRow.querySelector('[data-hovercard-url^="/hulkag/ds24-digistore/pull/"]').dataset.hovercardUrl.firstMatch(/pull\/(\d+)/);
                 jiraTicket = branchName.firstMatch(/(DS-\d+)/).toUpperCase();
             } else {
                 name = branchQuery;
