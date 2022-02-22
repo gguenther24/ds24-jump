@@ -1,242 +1,108 @@
-const JUMP_TARGETS = [
-    {
-        name: 'Jira Ticket',
-        id: 'jira',
-        icon: 'assets/icon-jira.png',
-        bypassPing: false,
-        matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://digistore.atlassian.net/browse/');
-        },
-        getIdentifier: function (tab) {
-            const ticketNo = tab.url.match(/\/browse\/(DS-\d+)/)[1];
-            console.log(ticketNo);
-            return new Identifier(null, ticketNo);
-        },
-        createUrl: function (identifier) {
-            return {
-                primary: {
-                    link: 'https://digistore.atlassian.net/browse/' + identifier.jiraTicket,
-                    label: this.name
-                }
-            }
-        }
-    },
-    {
-        name: 'GitHub PR',
-        id: 'github_pr',
-        icon: 'assets/icon-merge.png',
-        bypassPing: false,
-        matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/pull/');
-        },
-        getIdentifier: function (tab) {
-            const prId = tab.url.match(/pull\/(\d+)/);
-            return new Identifier(prId ? prId[1] : null, null);
-        },
-        createUrl: function (identifier) {
-            return {
-                primary: {
-                    link: 'https://github.com/hulkag/ds24-digistore/pull/' + identifier.githubPrId,
-                    label: this.name
-                }
-            }
-        }
-    },
-    {
-        name: 'GitHub Find',
-        id: 'github_find',
-        icon: 'assets/icon-github.png',
-        bypassPing: true,
-        matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/tree/');
-        },
-        getIdentifier: function (tab) {
-            const jiraTicket = tab.url.match(/(DS-\d+)/);
-            return new Identifier(null, jiraTicket ? jiraTicket[1] : null);
-        },
-        createUrl: function (identifier) {
-            return {
-                primary: {
-                    link: 'https://github.com/hulkag/ds24-digistore/branches/all?query=' + identifier.jiraTicket,
-                    label: 'Find Branches'
-                },
-                secondary: {
-                    link: 'https://github.com/hulkag/ds24-digistore/pulls?q=' + identifier.jiraTicket + '+in%3Atitle',
-                    label: 'Find PRs'
-                }
-            };
-        }
-    },
-    {
-        name: 'DynEnv',
-        id: 'dynenv',
-        icon: 'assets/icon-dynenv.png',
-        bypassPing: false,
-        matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://digistore24-app-ds-review-');
-        },
-        getIdentifier: function (tab) {
-            const prId = tab.url.match(/digistore24-app-ds-review-(\d+)\./)[1];
-            return new Identifier(prId, null);
-        },
-        createUrl: function (identifier) {
-            return {
-                primary: {
-                    link: 'https://digistore24-app-ds-review-' + identifier.githubPrId + '.dev.ds25.io',
-                    label: this.name
-                }
-            };
-        }
-    },
-    {
-        name: 'GMail',
-        id: 'gmail',
-        icon: 'assets/icon-gmail.png',
-        bypassPing: true,
-        matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://mail.google.com/');
-        },
-        getIdentifier: function (tab) {
-            const ticketNo = tab.title.match(/ (DS-\d+)/)[1];
-            return new Identifier(0, ticketNo);
-        },
-        createUrl: function (identifier) {
-            return {
-                primary: {
-                    link: 'https://mail.google.com/mail/#search/' + identifier.jiraTicket,
-                    label: identifier.jiraTicket
-                },
-                secondary: {
-                    link: 'https://mail.google.com/mail/#search/' + encodeURIComponent('#' + identifier.githubPrId),
-                    label: '#' + identifier.githubPrId
-                }
-            };
-        }
-    }
-];
-
-const Identifier = class {
-    constructor(githubPrId = 0, jiraTicket = '', name = '') {
-        this.githubPrId = githubPrId;
-        this.jiraTicket = jiraTicket;
-        this.name = name;
-    }
-
-    hasGithubPrId() {
-        return Number(this.githubPrId) !== 0;
-    }
-
-    hasJiraTicket() {
-        return String(this.jiraTicket).startsWith('DS-')
-    }
-
-    sync() {
-        switch (true) {
-            case this.hasJiraTicket():
-                return fetch('https://github.com/hulkag/ds24-digistore/pulls?q=in%3Atitle+' + this.jiraTicket).then(r => r.text()).then(result => {
-                    const dom = document.createElement("body");
-                    dom.innerHTML = result;
-                    let a = dom.querySelector('[data-hovercard-type="pull_request"]');
-                    console.log(a);
-                    if (a) {
-                        this.name = a.textContent;
-                        this.githubPrId = a.getAttribute('href').match(/pull\/(\d+)/)[1];
-                    } else {
-                        this.name = this.jiraTicket;
-                    }
-                    return this;
-                });
-            case this.hasGithubPrId():
-                return fetch('https://github.com/hulkag/ds24-digistore/pull/' + this.githubPrId).then(r => r.text()).then(result => {
-                    const dom = document.createElement("body");
-                    dom.innerHTML = result;
-                    const jiraTicketTitle = dom.querySelector('h1.gh-header-title').textContent.trim();
-                    console.log("Jira Ticket title", jiraTicketTitle);
-                    this.name = jiraTicketTitle;
-                    let title = jiraTicketTitle.match(/DS[- _]\d{2,4}/);
-                    this.jiraTicket = title ? title[0].replace(/_| /, '-') : jiraTicketTitle;
-                    return this;
-                });
-            default:
-                return null;
-        }
-    }
-}
+import {JUMP_TARGETS, getDefaultOptions} from "./common.js";
 
 function ping(url) {
     return fetch(url, {method: 'HEAD'}).then(function (response) {
         return response.status === 200;
     }, function () {
         return false;
-    })
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const DS24_REPO = 'https://github.com/hulkag/ds24-digistore';
     const dialogBox = document.getElementById('dialog-box');
     const query = {active: true, currentWindow: true};
 
     chrome.tabs.query(query, (tabs) => {
         const tab = tabs[0];
-        let identifier;
+        let identifierPromise;
 
         for (let jumpTarget of JUMP_TARGETS) {
             if (jumpTarget.matchesCurrentTab(tab)) {
-                identifier = jumpTarget.getIdentifier(tab);
-                let syncResult = identifier.sync();
-                if (null === syncResult) {
-                    buildFallbackDialogBoxContent();
-                } else {
-                    syncResult.then(function (syncedIdentifier) {
-                        buildDialogBoxContent(syncedIdentifier);
-                    });
-                }
+                identifierPromise = jumpTarget.getIdentifier(tab);
+
+                identifierPromise.then(function (identifier) {
+                    buildDialogBoxContent(identifier, jumpTarget);
+                });
                 break;
             }
         }
 
-        if (!identifier) {
+        if (!identifierPromise) {
             buildFallbackDialogBoxContent();
         }
     });
 
     function buildFallbackDialogBoxContent() {
-        dialogBox.classList.add('loaded');
-        dialogBox.innerHTML = '';
-        const fallbackLinks = [
-            ['DS24 Github', 'https://github.com/hulkag/ds24-digistore'],
-            ['My Pull Requests', 'https://github.com/hulkag/ds24-digistore/pulls/@me'],
-            ['Jira', 'https://digistore.atlassian.net/jira/software/c/projects/DS/issues'],
-            ['Scrum Dashboard', 'https://digistore.atlassian.net/jira/dashboards/10540'],
-            ['Google Cloud', 'https://console.cloud.google.com/home/dashboard?project=ds-dev-228617'],
-        ];
-        fallbackLinks.forEach(function(linkData) {
-            dialogBox.innerHTML += `<div class="jump-link-group"><a target="_blank" class="jump-link online" href="${linkData[1]}">${linkData[0]}</a></div>`;
+
+        chrome.storage.sync.get(getDefaultOptions()).then(function (jqueryJumpOpts) {
+            let fallbackLinks = JSON.parse(jqueryJumpOpts.default_jumps);
+            dialogBox.classList.add('loaded');
+            dialogBox.innerHTML = '';
+            fallbackLinks.forEach(function (linkGroup) {
+                let groupHtml = '<div class="jump-link-group">'
+                linkGroup.forEach(function (linkData) {
+                    groupHtml += `<a target="_blank" class="jump-link online" href="${linkData[1]}">${linkData[0]}</a>`;
+                });
+                groupHtml += '</div>'
+                dialogBox.innerHTML += groupHtml;
+
+            });
         });
     }
 
-    function buildDialogBoxContent(identifier) {
-        let anchors = [];
-        for (let jumpTarget of JUMP_TARGETS) {
-            let urlData = jumpTarget.createUrl(identifier),
-                name = jumpTarget.name,
-                id = jumpTarget.id;
-            if (!jumpTarget.bypassPing) {
-                ping(urlData.primary.link).then(function (isAvailable) {
-                    if (isAvailable) {
-                        document.getElementById('jump_' + id).classList.add('online');
-                    } else {
-                        document.getElementById('jump_' + id).classList.add('offline');
+    function buildDialogBoxContent(identifier, currentJumpTarget) {
+
+        chrome.storage.sync.get(getDefaultOptions()).then(function (jqueryJumpOpts) {
+
+            let anchors = [];
+
+            for (let jumpTarget of JUMP_TARGETS) {
+
+                // Check if options is activated by user
+                if (jqueryJumpOpts[jumpTarget.id]) {
+                    let urlData = jumpTarget.createUrl(identifier),
+                        id = jumpTarget.id;
+                    if (!jumpTarget.bypassPing) {
+                        ping(urlData.primary.link).then(function (isAvailable) {
+                            if (isAvailable) {
+                                document.getElementById('jump_' + id).classList.add('online');
+                            } else {
+                                document.getElementById('jump_' + id).classList.add('offline');
+                            }
+                        });
                     }
-                });
+
+                    let defaultClass = '';
+                    if (!urlData.primary.link) {
+                        defaultClass = 'offline';
+                    } else if (jumpTarget.bypassPing) {
+                        defaultClass = 'online';
+                    }
+                    let isActive = currentJumpTarget.id === jumpTarget.id;
+                    let anchorHtml = `<a class="jump-link ${isActive ? 'current' : ''} ${defaultClass}" id="jump_${id}" href="${urlData.primary.link}" target="_blank"><img src="${jumpTarget.icon}"> <span>${urlData.primary.label}</span> ${jumpTarget.bypassPing ? '' : '<span class="status-indicator"></span>'}</a>`;
+                    if (urlData.hasOwnProperty('secondary')) {
+                        anchorHtml += `<a class="jump-link online" id="jump_secondary_${id}" href="${urlData.secondary.link}" target="_blank"><span>${urlData.secondary.label}</span></a>`;
+                    }
+                    anchors.push(`<div class="jump-link-group">${anchorHtml}</div>`);
+                }
             }
-            let anchorHtml = `<a class="jump-link ${jumpTarget.bypassPing ? 'online' : ''}" id="jump_${id}" href="${urlData.primary.link}" target="_blank"><img src="${jumpTarget.icon}"> <span>${urlData.primary.label}</span> ${jumpTarget.bypassPing ? '' : '<span class="status-indicator"></span>'}</a>`;
-            if (urlData.hasOwnProperty('secondary')) {
-                anchorHtml += `<a class="jump-link online" id="jump_secondary_${id}" href="${urlData.secondary.link}" target="_blank"><span>${urlData.secondary.label}</span></a>`;
+            dialogBox.classList.add('loaded');
+            dialogBox.innerHTML = '<strong style="font-size: 20px;">' + identifier.name + '</strong>';
+            dialogBox.innerHTML += anchors.join('');
+
+            // DX: No results?
+            if (dialogBox.querySelectorAll('.online').length <= 1) {
+                dialogBox.innerHTML = `<div class="alert"><svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" data-view-component="true" style="margin-right: 5px;"><path fill-rule="evenodd" d="M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 01-1.484.211c-.04-.282-.163-.547-.37-.847a8.695 8.695 0 00-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.75.75 0 01-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75zM6 15.25a.75.75 0 01.75-.75h2.5a.75.75 0 010 1.5h-2.5a.75.75 0 01-.75-.75zM5.75 12a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5z"></path></svg> Are you&nbsp;<a target="_blank" href="${DS24_REPO}">logged in into Github</a>?</div>${dialogBox.innerHTML}`;
             }
-            anchors.push(`<div class="jump-link-group">${anchorHtml}</div>`);
-        }
-        dialogBox.classList.add('loaded');
-        dialogBox.innerHTML = '<strong>' + identifier.name + '</strong>';
-        dialogBox.innerHTML += anchors.join('');
+        });
     }
+
+    document.getElementById('logo').addEventListener('click', function () {
+        if (chrome.runtime.openOptionsPage) {
+            chrome.runtime.openOptionsPage();
+        } else {
+            window.open(chrome.runtime.getURL('options.html'));
+        }
+    });
 });

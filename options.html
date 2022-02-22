@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DigiJump Options</title>
+    <style>
+        body {
+            font-size: 16px;
+        }
+        form {
+            display: flex;
+            flex-direction: row;
+        }
+        fieldset {
+            border: 0;
+            width: 50%;
+            margin: 0;
+            background: #f2f2f2;
+        }
+        label {
+            display: grid;
+            grid-template-columns: 30px 40px fit-content(100%);
+            grid-template-areas: "checkbox icon label"
+                                "checkbox icon description";
+            margin: 0 5px;
+            padding: 5px;
+        }
+
+        label:not(:last-child) {
+            border-bottom: 1px solid #ccc;
+        }
+
+        label img {
+            margin: 0 5px;
+            grid-area: icon;
+        }
+
+        label input {
+            grid-area: checkbox;
+        }
+
+        label span.label {
+            grid-area: label;
+        }
+
+        label span.description {
+            grid-area: description;
+            color: #444;
+            font-size: small;
+        }
+
+        label input ~ img,
+        label input ~ span:nth-of-type(2) {
+            filter: grayscale(1);
+            opacity: .25;
+            transition: all .25s ease-in-out;
+        }
+
+        label input:checked ~ img,
+        label input:checked ~ span:nth-of-type(2) {
+            filter: grayscale(0);
+            opacity: 1;
+        }
+
+        textarea#default_jumps {
+            width: 100%;
+            height: 100%;
+            font-family: monospace;
+        }
+
+        #status {
+            background: rgba(255, 255, 0, 0.5);
+            height: 24px;
+            font-size: 15px;
+            font-weight: bold;
+            padding-left: 5px;
+            line-height: 24px;
+        }
+        #status:empty {
+            visibility: hidden;
+        }
+
+        button {
+            padding: 5px 10px;
+            margin-right: 2px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        button#restore {
+            font-weight: normal;
+        }
+
+        #logo {
+            max-width: 200px;
+            float: right;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <img src="assets/logo_wide.png" alt="Digistore24 Logo" id="logo">
+    <h1>DigiJump Settings</h1>
+</header>
+<form>
+    <fieldset>
+        <strong style="display: block; margin: 2px 0 6px 0;">Active Jump Links</strong>
+        <div id="jumpOptions"></div>
+    </fieldset>
+    <fieldset>
+        <strong style="display: block; margin: 2px 0 6px 0;">Default Jump Links (JSON)</strong>
+        <div id="defaultJumps">
+            <textarea id="default_jumps" cols="30" rows="25"></textarea>
+            <em>The default jump links are shown when no Digistore Context was detected.</em>
+        </div>
+    </fieldset>
+</form>
+
+<div id="status"></div>
+<button id="restore">&circlearrowright; Restore settings</button>
+<button id="save">Save settings &check;</button>
+
+<script src="options.js" type="module"></script>
+</body>
+</html>

@@ -54,6 +54,11 @@ header,
     width: 100%;
 }
 
+.jump-link.current {
+    font-weight: bold;
+    pointer-events: none;
+}
+
 .jump-link img,
 .jump-link span {
     margin-right: 6px;
@@ -84,4 +89,18 @@ header,
 .offline img {
     opacity: .25;
     filter: grayscale(1);
+}
+
+.alert {
+    background: rgba(181,149,0,0.17);
+    border: 1px solid rgba(220, 183, 2, 0.75);
+    margin: 6px;
+    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    border-radius: 3px;
+}
+
+.alert, .alert a {
+    color: #000;
 }
