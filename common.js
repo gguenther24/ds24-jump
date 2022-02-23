@@ -215,12 +215,10 @@ export const JUMP_TARGETS = [
         bypassPing: true,
         activated: true,
         matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://console.cloud.google.com'); // TODO
+            return tab.url.startsWith('https://console.cloud.google.com') && !!tab.url.match(/review-\d+/)
         },
         getIdentifier: function (tab) {
-        return identifierFactory.fromGithubPrId(790);
             const prId = tab.url.firstMatch(/resource\.labels\.namespace_name%3D%22review-(\d+)-ds/);
-
             return identifierFactory.fromGithubPrId(prId);
         },
         createUrl: function (identifier) {
