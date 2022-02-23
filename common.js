@@ -208,6 +208,31 @@ export const JUMP_TARGETS = [
         }
     },
     {
+        name: 'Stackdriver Logs',
+        description: 'Jump to the associated Stackdriver Logs',
+        id: 'cloudwatch',
+        icon: 'assets/icon-stackdriver.png',
+        bypassPing: true,
+        activated: true,
+        matchesCurrentTab: function (tab) {
+            return tab.url.startsWith('https://console.cloud.google.com'); // TODO
+        },
+        getIdentifier: function (tab) {
+        return identifierFactory.fromGithubPrId(790);
+            const prId = tab.url.firstMatch(/resource\.labels\.namespace_name%3D%22review-(\d+)-ds/);
+
+            return identifierFactory.fromGithubPrId(prId);
+        },
+        createUrl: function (identifier) {
+            return {
+                primary: {
+                    link: `https://console.cloud.google.com/logs/query;query=resource.type%3D%22k8s_container%22%0Aresource.labels.project_id%3D%22ds-dev-228617%22%0Aresource.labels.namespace_name%3D%22review-${identifier.githubPrId}-ds%22?project=ds-dev-228617`,
+                    label: this.name
+                }
+            };
+        }
+    },
+    {
         name: 'Sonarcloud',
         description: 'Jump to Sonarcloud overview',
         id: 'sonarcloud',
