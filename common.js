@@ -7,13 +7,13 @@ const Identifier = class {
     }
 }
 
-String.prototype.firstMatch = function(regexp, alt = '') {
+String.prototype.firstMatch = function (regexp, alt = '') {
     let matchResult = this.match(regexp);
     return matchResult[1] || alt;
 }
 
 const identifierFactory = {
-    _queryBranchListing: function (branchQuery) {
+    _queryBranchListing: function (branchQuery, selectedDepartment) {
         return fetch('https://github.com/hulkag/ds24-digistore/branches/all?query=' + branchQuery).then(r => r.text()).then(result => {
             const dom = document.createElement("body");
             dom.innerHTML = result;
@@ -22,7 +22,7 @@ const identifierFactory = {
             if (branchRow) {
                 branchName = branchRow.getAttribute('branch');
                 name = branchRow.querySelector('.branch-name').textContent;
-                githubPrId = branchRow.querySelector('[data-hovercard-url^="/hulkag/ds24-digistore/pull/"]').dataset.hovercardUrl.firstMatch(/pull\/(\d+)/);
+                githubPrId = branchRow.querySelector('[data-hovercard-type="pull_request"]').dataset.hovercardUrl.firstMatch(/pull\/(\d+)/);
                 jiraTicket = branchName.firstMatch(/(DS-\d+)/).toUpperCase();
             } else {
                 name = branchQuery;
@@ -33,14 +33,13 @@ const identifierFactory = {
             return new Identifier(githubPrId, jiraTicket, branchName, name);
         });
     },
-    fromJiraTicket: function (jiraTicket) {
-        return this._queryBranchListing(jiraTicket);
+    fromJiraTicket: function (jiraTicket, selectedDepartment) {
+        return this._queryBranchListing(jiraTicket, selectedDepartment);
     },
-    fromBranchName: function (branchName) {
-        return this._queryBranchListing(branchName);
+    fromBranchName: function (branchName, selectedDepartment) {
+        return this._queryBranchListing(branchName, selectedDepartment);
     },
-    fromGithubPrId: function (githubPrId) {
-        console.log(githubPrId);
+    fromGithubPrId: function (githubPrId, selectedDepartment) {
         return fetch(`https://github.com/hulkag/ds24-digistore/pull/${githubPrId}`).then(r => r.text()).then(result => {
             const dom = document.createElement("body");
             dom.innerHTML = result;
@@ -57,12 +56,49 @@ const identifierFactory = {
 }
 
 export function getDefaultOptions() {
-    let queryJumpIds = {};
+    let defaultOpts = {};
     for (let jumpTarget of JUMP_TARGETS) {
-        queryJumpIds[jumpTarget.id] = jumpTarget.activated;
+        defaultOpts[jumpTarget.id] = jumpTarget.activated;
     }
-    queryJumpIds['default_jumps'] = JSON.stringify(DEFAULT_JUMPS, null, 2);
-    return queryJumpIds;
+    defaultOpts['default_jumps'] = JSON.stringify(DEFAULT_JUMPS, null, 2);
+    defaultOpts['department'] = 'digistore24';
+    return defaultOpts;
+}
+
+export const DEPARTMENT_RULESET = {
+    digistore24: {
+        name: 'Digistore24',
+        icon: 'assets/icon-32.png',
+        rules: {
+            githubRepo: 'https://github.com/hulkag/ds24-digistore',
+            ticketPattern: 'DS[- _]\\d{2,4}',
+            ticketPrefix: 'DS-'
+        }
+    },
+    cch_platform: {
+        name: 'CCH Platform',
+        icon: 'assets/icon-cch-20.png',
+        rules: {
+            githubRepo: 'https://github.com/hulkag/cch-platform',
+            ticketPattern: 'DS[- _]\\d{2,4}',
+            ticketPrefix: 'DS-'
+        }
+    },
+    cch_pagebuilder: {
+        name: 'CCH PageBuilder',
+        icon: 'assets/icon-cch-20.png',
+        rules: {
+            githubRepo: 'https://github.com/hulkag/cch-pagebuilder',
+            ticketPattern: 'DS[- _]\\d{2,4}',
+            ticketPrefix: 'DS-'
+        }
+    }
+}
+
+export function getCurrentDepartment() {
+    return chrome.storage.sync.get(getDefaultOptions()).then(function (options) {
+        return DEPARTMENT_RULESET[options.department];
+    });
 }
 
 export const JUMP_TARGETS = [
@@ -73,14 +109,14 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-jira.png',
         bypassPing: false,
         activated: true,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return tab.url.startsWith('https://digistore.atlassian.net/browse/');
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const ticketNo = tab.url.firstMatch(/\/browse\/(DS-\d+)/);
             return identifierFactory.fromJiraTicket(ticketNo);
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
                     link: `https://digistore.atlassian.net/browse/${identifier.jiraTicket}`,
@@ -96,17 +132,17 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-merge.png',
         bypassPing: false,
         activated: true,
-        matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/pull/');
+        matchesCurrentTab: function (tab, selectedDepartment) {
+            return tab.url.startsWith(`${selectedDepartment.rules.githubRepo}/pull/`);
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const prId = tab.url.firstMatch(/pull\/(\d+)/);
             return identifierFactory.fromGithubPrId(prId);
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
-                    link: identifier.githubPrId ? `https://github.com/hulkag/ds24-digistore/pull/${identifier.githubPrId}` : null,
+                    link: identifier.githubPrId ? `${selectedDepartment.rules.githubRepo}/pull/${identifier.githubPrId}` : null,
                     label: this.name
                 }
             }
@@ -119,10 +155,10 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-branch.png',
         bypassPing: false,
         activated: true,
-        matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/tree/') && tab.url.includes('DS-');
+        matchesCurrentTab: function (tab, selectedDepartment) {
+            return tab.url.startsWith(`${selectedDepartment.rules.githubRepo}/tree/`) && tab.url.includes(selectedDepartment.rules.ticketPrefix);
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const branchName = tab.url.firstMatch(/ds24-digistore\/tree\/([A-z0-9-_]+)/i);
             return identifierFactory.fromBranchName(branchName);
         },
@@ -142,13 +178,13 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-github.png',
         bypassPing: true,
         activated: false,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return false;
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             return identifierFactory.empty();
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
                     link: `https://github.com/hulkag/ds24-digistore/branches/all?query=${identifier.jiraTicket}`,
@@ -168,14 +204,14 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-workflow.png',
         bypassPing: true,
         activated: true,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/actions') && tab.url.includes('branch%3A');
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const branch = tab.url.match(/DS-\d+/i);
             return branch ? identifierFactory.fromBranchName(branch) : identifierFactory.empty();
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
                     link: identifier.branchName ? `https://github.com/hulkag/ds24-digistore/actions?query=${encodeURIComponent('event:pull_request branch:' + identifier.branchName)}` : null,
@@ -191,14 +227,14 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-dynenv.png',
         bypassPing: false,
         activated: true,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return tab.url.startsWith('https://digistore24-app-ds-review-');
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const prId = tab.url.firstMatch(/digistore24-app-ds-review-(\d+)\./);
             return identifierFactory.fromGithubPrId(prId);
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
                     link: `https://digistore24-app-ds-review-${identifier.githubPrId}.dev.ds25.io`,
@@ -214,14 +250,14 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-stackdriver.png',
         bypassPing: true,
         activated: true,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return tab.url.startsWith('https://console.cloud.google.com') && !!tab.url.match(/review-\d+/)
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const prId = tab.url.firstMatch(/resource\.labels\.namespace_name%3D%22review-(\d+)-ds/);
             return identifierFactory.fromGithubPrId(prId);
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
                     link: `https://console.cloud.google.com/logs/query;query=resource.type%3D%22k8s_container%22%0Aresource.labels.project_id%3D%22ds-dev-228617%22%0Aresource.labels.namespace_name%3D%22review-${identifier.githubPrId}-ds%22?project=ds-dev-228617`,
@@ -237,14 +273,14 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-sonarcloud.png',
         bypassPing: true,
         activated: false,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return tab.url.startsWith('https://sonarcloud.io/') && tab.url.includes('pullRequest=');
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const prId = tab.url.firstMatch(/pullRequest=(\d+)/);
             return identifierFactory.fromGithubPrId(prId);
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
                     link: identifier.githubPrId ? `https://sonarcloud.io/summary/new_code?id=ds24-symfony&pullRequest=${identifier.githubPrId}` : null,
@@ -260,14 +296,14 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-apm.png',
         bypassPing: true,
         activated: true,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return tab.url.startsWith('https://hulk-observability-staging.kb.europe-west1.gcp.cloud.es.io:9243/app/apm') && tab.url.includes('environment=review-');
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const prId = tab.url.firstMatch(/environment=review-(\d+)/);
             return identifierFactory.fromGithubPrId(prId);
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
             return {
                 primary: {
                     link: identifier.githubPrId
@@ -285,14 +321,14 @@ export const JUMP_TARGETS = [
         icon: 'assets/icon-gmail.png',
         bypassPing: true,
         activated: false,
-        matchesCurrentTab: function (tab) {
+        matchesCurrentTab: function (tab, selectedDepartment) {
             return tab.url.startsWith('https://mail.google.com/');
         },
-        getIdentifier: function (tab) {
+        getIdentifier: function (tab, selectedDepartment) {
             const ticketNo = tab.title.firstMatch(/ (DS-\d+)/);
             return identifierFactory.fromJiraTicket(ticketNo);
         },
-        createUrl: function (identifier) {
+        createUrl: function (identifier, selectedDepartment) {
 
             let url = identifier.jiraTicket
                 ? {
@@ -303,12 +339,12 @@ export const JUMP_TARGETS = [
                     label: '#' + identifier.githubPrId
                 }
 
-            return { primary: url };
+            return {primary: url};
         }
     }
 ];
 
-export const DEFAULT_JUMPS = [
+const DEFAULT_JUMPS = [
     [
         [
             "Jira",

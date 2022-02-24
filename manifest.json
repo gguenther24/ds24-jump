@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DigiJump",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A Chrome/Chromium Browser Extension providing a quick jump between Jira Tickets, GitHub PRs and DynEnv.",
   "homepage_url": "https://github.com/dsentker24/ds24-jump",
   "action": {
@@ -22,7 +22,8 @@
     "keyword": "ds24"
   },
   "background": {
-    "service_worker": "assets/service_worker.js"
+    "service_worker": "assets/service_worker.js",
+    "type": "module"
   },
   "host_permissions": [
     "https://github.com/*",
