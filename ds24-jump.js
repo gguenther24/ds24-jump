@@ -21,9 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (jumpTarget.matchesCurrentTab(tab)) {
                 identifierPromise = jumpTarget.getIdentifier(tab);
 
-                identifierPromise.then(function (identifier) {
-                    buildDialogBoxContent(identifier, jumpTarget);
-                });
+                if (identifierPromise) {
+                    identifierPromise.then(function (identifier) {
+                        buildDialogBoxContent(identifier, jumpTarget);
+                    });
+                }
                 break;
             }
         }
@@ -63,6 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (jqueryJumpOpts[jumpTarget.id]) {
                     let urlData = jumpTarget.createUrl(identifier),
                         id = jumpTarget.id;
+                    if (!urlData) {
+                        continue;
+                    }
                     if (!jumpTarget.bypassPing) {
                         ping(urlData.primary.link).then(function (isAvailable) {
                             if (isAvailable) {

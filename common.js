@@ -1,20 +1,61 @@
+const Contexts = [
+  {
+    'projectKey': 'DS',
+    'repo': 'hulkag/ds24-digistore',
+    'dynPrefix': 'digistore24-app-ds',
+    'stackdriverSuffix': 'ds',
+    'sonarIds': {
+      'symfony': 'ds24-symfony',
+      'codeigniter': 'ds24-legacy'
+    }
+  },
+  {
+    'projectKey': 'OCB',
+    'repo': 'hulkag/cch-platform',
+    'dynPrefix': 'cch',
+    'stackdriverSuffix': 'cch',
+    'sonarIds': {
+      'backend': 'cch-frontend',
+      'frontend': 'cch-backend'
+    }
+  },
+  {
+    'projectKey': 'PGB',
+    'repo': 'hulkag/cch-pagebuilder',
+    'dynPrefix': 'pgb',
+    'stackdriverSuffix': 'pgb',
+    'sonarIds': {
+      'pgb': 'cch-pagebuilder'
+    }
+  },
+  {
+    'projectKey': 'DD',
+    'repo': 'hulkag/dd-ui',
+    'dynPrefix': 'dd',
+    'stackdriverSuffix': 'dd',
+    'sonarIds': {}
+  }
+]
+
 const Identifier = class {
-    constructor(githubPrId = 0, jiraTicket = '', branchName = '', name = '') {
+    constructor(githubPrId = 0, jiraTicket = '', branchName = '', name = '', context = Contexts[0]) {
         this.githubPrId = githubPrId;
         this.branchName = branchName
         this.jiraTicket = jiraTicket;
         this.name = name;
+        this.context = context;
     }
 }
 
 String.prototype.firstMatch = function(regexp, alt = '') {
     let matchResult = this.match(regexp);
-    return matchResult[1] || alt;
+    console.log(regexp, matchResult, this);
+    return (matchResult ? matchResult[1] : alt);
 }
 
 const identifierFactory = {
-    _queryBranchListing: function (branchQuery) {
-        return fetch('https://github.com/hulkag/ds24-digistore/branches/all?query=' + branchQuery).then(r => r.text()).then(result => {
+    queryBranchListing: function (branchQuery, context = Contexts[0]) {
+        return fetch(`https://github.com/${context.repo}/branches/all?query=${branchQuery}`).then(r => r.text()).then(result => {
             const dom = document.createElement("body");
             dom.innerHTML = result;
             let branchRow = dom.querySelector('branch-filter-item[branch]');
@@ -22,37 +63,45 @@ const identifierFactory = {
             if (branchRow) {
                 branchName = branchRow.getAttribute('branch');
                 name = branchRow.querySelector('.branch-name').textContent;
-                githubPrId = branchRow.querySelector('[data-hovercard-url^="/hulkag/ds24-digistore/pull/"]').dataset.hovercardUrl.firstMatch(/pull\/(\d+)/);
-                jiraTicket = branchName.firstMatch(/(DS-\d+)/).toUpperCase();
+                githubPrId = branchRow.querySelector('[data-hovercard-url^="/'+context.repo+'/pull/"]').dataset.hovercardUrl.firstMatch(/pull\/(\d+)/);
+                jiraTicket = branchName.firstMatch(/(\S{2,3}-\d{2,5})/).toUpperCase();
             } else {
                 name = branchQuery;
-                if (branchQuery.match(/^DS-\d+$/i)) {
+                if (branchQuery.match(/^\S{2,3}-\d{2,5}$/i)) {
                     jiraTicket = branchQuery;
                 }
             }
-            return new Identifier(githubPrId, jiraTicket, branchName, name);
+            return new Identifier(githubPrId, jiraTicket, branchName, name, context);
         });
     },
-    fromJiraTicket: function (jiraTicket) {
-        return this._queryBranchListing(jiraTicket);
-    },
-    fromBranchName: function (branchName) {
-        return this._queryBranchListing(branchName);
-    },
-    fromGithubPrId: function (githubPrId) {
-        console.log(githubPrId);
-        return fetch(`https://github.com/hulkag/ds24-digistore/pull/${githubPrId}`).then(r => r.text()).then(result => {
+    fromGithubPrId: function (githubPrId, context = Contexts[0]) {
+        console.log(githubPrId, context);
+        return fetch(`https://github.com/${context.repo}/pull/${githubPrId}`).then(r => r.text()).then(result => {
             const dom = document.createElement("body");
             dom.innerHTML = result;
             let branchName, jiraTicket, name;
             name = dom.querySelector('h1.gh-header-title > span:first-child').textContent.trim();
-            jiraTicket = name.match(/DS[- _]\d{2,4}/);
+            jiraTicket = name.firstMatch(/(\S{2,3}[- _]\d{2,5})/).replace(/_| /i,'-');
             branchName = dom.querySelector('.gh-header-meta span.head-ref > a > span').textContent.trim();
-            return new Identifier(githubPrId, jiraTicket, branchName, name);
+            return new Identifier(githubPrId, jiraTicket, branchName, name, context);
         });
     },
-    empty: function () {
-        return new Identifier();
+    getContextFromKeyInDict: function (key, value) {
+        const context = Contexts.find((context) => {
+            for (let index in context[key]) {
+                if (context[key][index] === value) {
+                    return true;
+                }
+            }
+            return false;
+        });
+        return context;
+    },
+    getContextFromKey: function (key, value) {
+        const context = Contexts.find((context) => {
+            return context[key] === value;
+        });
+        return context;
     }
 }
 
@@ -77,8 +126,15 @@ export const JUMP_TARGETS = [
             return tab.url.startsWith('https://digistore.atlassian.net/browse/');
         },
         getIdentifier: function (tab) {
-            const ticketNo = tab.url.firstMatch(/\/browse\/(DS-\d+)/);
-            return identifierFactory.fromJiraTicket(ticketNo);
+            let ticketNo = tab.url.firstMatch(/\/browse\/(\S{2,3}-\d{2,5})/i);
+            if (ticketNo) {
+                const projetKey = ticketNo.split('-')[0];
+                let context = identifierFactory.getContextFromKey('projectKey', projetKey);
+                if (context) {
+                    return identifierFactory.queryBranchListing(ticketNo, context);
+                }
+            }
+            return null;
         },
         createUrl: function (identifier) {
             return {
@@ -97,16 +153,22 @@ export const JUMP_TARGETS = [
         bypassPing: false,
         activated: true,
         matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/pull/');
+            let regex = new RegExp('^https://github.com/hulkag/[^/]+/pull/');
+            return !!tab.url.match(regex);
         },
         getIdentifier: function (tab) {
-            const prId = tab.url.firstMatch(/pull\/(\d+)/);
-            return identifierFactory.fromGithubPrId(prId);
+            let match = tab.url.match(/github.com\/([^/]+\/[^/]+)\/pull\/(\d+)/i);
+            console.log(match);
+            let context = identifierFactory.getContextFromKey('repo', match[1]);
+            if (context) {
+                return identifierFactory.fromGithubPrId(match[2], context);
+            }
+            return null;
         },
         createUrl: function (identifier) {
             return {
                 primary: {
-                    link: identifier.githubPrId ? `https://github.com/hulkag/ds24-digistore/pull/${identifier.githubPrId}` : null,
+                    link: identifier.githubPrId ? `https://github.com/${identifier.context.repo}/pull/${identifier.githubPrId}` : null,
                     label: this.name
                 }
             }
@@ -120,16 +182,22 @@ export const JUMP_TARGETS = [
         bypassPing: false,
         activated: true,
         matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/tree/') && tab.url.includes('DS-');
+            let regex = new RegExp('^https://github.com/hulkag/[^/]+/tree/\S{2,3}-\d{2,5}');
+            return !!tab.url.match(regex);
         },
         getIdentifier: function (tab) {
-            const branchName = tab.url.firstMatch(/ds24-digistore\/tree\/([A-z0-9-_]+)/i);
-            return identifierFactory.fromBranchName(branchName);
+            let match = tab.url.match(/github.com\/([^/]+\/[^/]+)\/pull\/(\d+)/i);
+            console.log(match);
+            let context = identifierFactory.getContextFromKey('repo', match[1]);
+            if (context) {
+                return identifierFactory.queryBranchListing(match[2], context);
+            }
+            return null;
         },
         createUrl: function (identifier) {
             return {
                 primary: {
-                    link: `https://github.com/hulkag/ds24-digistore/tree/${identifier.branchName}`,
+                    link: `https://github.com/${identifier.context.repo}/tree/${identifier.branchName}`,
                     label: this.name
                 }
             }
@@ -141,12 +209,12 @@ export const JUMP_TARGETS = [
         id: 'github_find',
         icon: 'assets/icon-github.png',
         bypassPing: true,
-        activated: false,
+        activated: true,
         matchesCurrentTab: function (tab) {
             return false;
         },
         getIdentifier: function (tab) {
-            return identifierFactory.empty();
+            return null;
         },
         createUrl: function (identifier) {
             return {
@@ -169,16 +237,20 @@ export const JUMP_TARGETS = [
         bypassPing: true,
         activated: true,
         matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://github.com/hulkag/ds24-digistore/actions') && tab.url.includes('branch%3A');
+            let regex = new RegExp('^https://github.com/hulkag/[^/]+/actions');
+            return !!tab.url.match(regex) && tab.url.includes('branch%3A');
         },
         getIdentifier: function (tab) {
-            const branch = tab.url.match(/DS-\d+/i);
-            return branch ? identifierFactory.fromBranchName(branch) : identifierFactory.empty();
+            let repo = tab.url.firstMatch(/github.com\/([^/]+\/[^/]+)\//i)
+            let branch = tab.url.match(/\S{2,3}-\d{2,5}/i);
+
+            let context = identifierFactory.getContextFromKey('repo', repo);
+            return branch ? identifierFactory.queryBranchListing(branch, context) : null;
         },
         createUrl: function (identifier) {
             return {
                 primary: {
-                    link: identifier.branchName ? `https://github.com/hulkag/ds24-digistore/actions?query=${encodeURIComponent('event:pull_request branch:' + identifier.branchName)}` : null,
+                    link: identifier.branchName ? `https://github.com/${identifier.context.repo}/actions?query=${encodeURIComponent('event:pull_request branch:' + identifier.branchName)}` : null,
                     label: 'Workflows'
                 }
             };
@@ -192,19 +264,56 @@ export const JUMP_TARGETS = [
         bypassPing: false,
         activated: true,
         matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://digistore24-app-ds-review-');
+            let regex = new RegExp('\\S+.dev.ds25.io');
+            return !!tab.url.match(regex);
         },
         getIdentifier: function (tab) {
-            const prId = tab.url.firstMatch(/digistore24-app-ds-review-(\d+)\./);
-            return identifierFactory.fromGithubPrId(prId);
+            let match = tab.url.firstMatch(/([^.^\/]+).dev.ds25.io/i);
+            console.log(match);
+            let context = null;
+            let prId = null;
+            if (match.includes('-dd')) {
+                context = identifierFactory.getContextFromKey('dynPrefix', 'dd');
+                prId = tab.url.firstMatch(/review-(\S+)-dd.dev.ds25.io/i);
+            } else {
+                let match = tab.url.match(/([^.^\/]+)-review-(\S+).dev.ds25.io/i);
+                console.log(match);
+                context = identifierFactory.getContextFromKey('dynPrefix', match[1]);
+                prId = match[2];
+            }
+            if (context) {
+                console.log(prId);
+                if (context.dynPrefix === 'pgb') {
+                    return identifierFactory.queryBranchListing(prId, context);
+                } else {
+                    return identifierFactory.fromGithubPrId(prId, context);
+                }
+            }
+            return null;
         },
         createUrl: function (identifier) {
-            return {
-                primary: {
-                    link: `https://digistore24-app-ds-review-${identifier.githubPrId}.dev.ds25.io`,
-                    label: this.name
-                }
-            };
+            if (identifier.context.projectKey === 'PGB') {
+                return {
+                    primary: {
+                        link: `https://${identifier.context.dynPrefix}-review-${identifier.branchName}.dev.ds25.io`,
+                        label: this.name
+                    }
+                };
+            } else if (identifier.context.projectKey === 'DD') {
+                return {
+                    primary: {
+                        link: `https://review-${identifier.githubPrId}-${identifier.context.dynPrefix}.dev.ds25.io`,
+                        label: this.name
+                    }
+                };
+            } else {
+                return {
+                    primary: {
+                        link: `https://${identifier.context.dynPrefix}-review-${identifier.githubPrId}.dev.ds25.io`,
+                        label: this.name
+                    }
+                };
+            }
         }
     },
     {
@@ -215,16 +324,21 @@ export const JUMP_TARGETS = [
         bypassPing: true,
         activated: true,
         matchesCurrentTab: function (tab) {
-            return tab.url.startsWith('https://console.cloud.google.com') && !!tab.url.match(/review-\d+/)
+            return tab.url.startsWith('https://console.cloud.google.com') && !!tab.url.match(/review-\S+/)
         },
         getIdentifier: function (tab) {
-            const prId = tab.url.firstMatch(/resource\.labels\.namespace_name%3D%22review-(\d+)-ds/);
-            return identifierFactory.fromGithubPrId(prId);
+            let match = tab.url.match(/resource.labels.namespace_name%3D%22review-(\d+)-(\S+)%22/i);
+            console.log(match);
+            let context = identifierFactory.getContextFromKey('stackdriverSuffix', match[2]);
+            if (context) {
+                return identifierFactory.fromGithubPrId(match[1], context);
+            }
+            return null;
         },
         createUrl: function (identifier) {
             return {
                 primary: {
-                    link: `https://console.cloud.google.com/logs/query;query=resource.type%3D%22k8s_container%22%0Aresource.labels.project_id%3D%22ds-dev-228617%22%0Aresource.labels.namespace_name%3D%22review-${identifier.githubPrId}-ds%22?project=ds-dev-228617`,
+                    link: `https://console.cloud.google.com/logs/query;query=resource.type%3D%22k8s_container%22%0Aresource.labels.project_id%3D%22ds-dev-228617%22%0Aresource.labels.namespace_name%3D%22review-${identifier.githubPrId}-${identifier.context.stackdriverSuffix}%22?project=ds-dev-228617`,
                     label: this.name
                 }
             };
@@ -236,21 +350,39 @@ export const JUMP_TARGETS = [
         id: 'sonarcloud',
         icon: 'assets/icon-sonarcloud.png',
         bypassPing: true,
-        activated: false,
+        activated: true,
         matchesCurrentTab: function (tab) {
             return tab.url.startsWith('https://sonarcloud.io/') && tab.url.includes('pullRequest=');
         },
         getIdentifier: function (tab) {
-            const prId = tab.url.firstMatch(/pullRequest=(\d+)/);
-            return identifierFactory.fromGithubPrId(prId);
+            let match = tab.url.match(/id=(\S+)&pullRequest=(\d+)/);
+            console.log(match);
+            let context = identifierFactory.getContextFromKeyInDict('sonarIds', match[1]);
+            if (context) {
+                return identifierFactory.fromGithubPrId(match[2], context);
+            }
+            return null;
         },
         createUrl: function (identifier) {
-            return {
-                primary: {
-                    link: identifier.githubPrId ? `https://sonarcloud.io/summary/new_code?id=ds24-symfony&pullRequest=${identifier.githubPrId}` : null,
-                    label: this.name
-                }
+            let response = {
             };
+
+            let keys = Object.keys(identifier.context.sonarIds);
+            if (keys.length == 0) {
+                return null;
+            }
+
+            response['primary'] = {
+                link: identifier.githubPrId ? `https://sonarcloud.io/summary/new_code?id=${identifier.context.sonarIds[keys[0]]}&pullRequest=${identifier.githubPrId}` : null,
+                label: this.name + ' ' + keys[0]
+            }
+            if (keys.length > 1) {
+                response['secondary'] = {
+                    link: identifier.githubPrId ? `https://sonarcloud.io/summary/new_code?id=${identifier.context.sonarIds[keys[1]]}&pullRequest=${identifier.githubPrId}` : null,
+                    label: this.name + ' ' + keys[1]
+                }
+            }
+            return response;
         }
     },
     {
@@ -264,14 +396,19 @@ export const JUMP_TARGETS = [
             return tab.url.startsWith('https://hulk-observability-staging.kb.europe-west1.gcp.cloud.es.io:9243/app/apm') && tab.url.includes('environment=review-');
         },
         getIdentifier: function (tab) {
-            const prId = tab.url.firstMatch(/environment=review-(\d+)/);
-            return identifierFactory.fromGithubPrId(prId);
+            let match = tab.url.match(/environment=review-(\d+)-(\S+)/i);
+            console.log(match);
+            let context = identifierFactory.getContextFromKey('stackdriverSuffix', match[2]);
+            if (context) {
+                return identifierFactory.fromGithubPrId(match[1], context);
+            }
+            return null;
         },
         createUrl: function (identifier) {
             return {
                 primary: {
                     link: identifier.githubPrId
-                        ? `https://hulk-observability-staging.kb.europe-west1.gcp.cloud.es.io:9243/app/apm/services?rangeFrom=now-15m&rangeTo=now&comparisonEnabled=true&comparisonType=day&environment=review-${identifier.githubPrId}-ds`
+                        ? `https://hulk-observability-staging.kb.europe-west1.gcp.cloud.es.io:9243/app/apm/services?rangeFrom=now-15m&rangeTo=now&comparisonEnabled=true&comparisonType=day&environment=review-${identifier.githubPrId}-${identifier.context.stackdriverSuffix}`
                         : null,
                     label: this.name
                 }
@@ -289,11 +426,17 @@ export const JUMP_TARGETS = [
             return tab.url.startsWith('https://mail.google.com/');
         },
         getIdentifier: function (tab) {
-            const ticketNo = tab.title.firstMatch(/ (DS-\d+)/);
-            return identifierFactory.fromJiraTicket(ticketNo);
+            const ticketNo = tab.title.firstMatch(/(\S{2,3}-\d{2,5})/);
+            if (ticketNo) {
+                const projetKey = ticketNo.split('-')[0];
+                let context = identifierFactory.getContextFromKey('projectKey', projetKey);
+                if (context) {
+                    return identifierFactory.queryBranchListing(ticketNo, context);
+                }
+            }
+            return null;
         },
         createUrl: function (identifier) {
-
             let url = identifier.jiraTicket
                 ? {
                     link: `https://mail.google.com/mail/#search/${identifier.jiraTicket}`,
